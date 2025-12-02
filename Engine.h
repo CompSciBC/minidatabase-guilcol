@@ -113,22 +113,24 @@ struct Engine
 	bool deleteById(int id)
 	{
 		// Find the record in idIndex
-		int *heapIndex = idIndex.find(id);
+		int *heapIndexPtr = idIndex.find(id);
 
-		if (!heapIndex) // Handle doesn't exist
+		if (!heapIndexPtr) // Handle doesn't exist
 			return false;
 
+		int heapIndex = *heapIndexPtr;
+
 		// Exists, "delete" it softly
-		heap[*heapIndex].deleted = true;
+		heap[heapIndex].deleted = true;
 		idIndex.erase(id); // Remove from idIndex
-		string lastNameLower = toLower(heap[*heapIndex].last);
+		string lastNameLower = toLower(heap[heapIndex].last);
 		// Find key for lastIndex
 		vector<int> *lastNameVector = lastIndex.find(lastNameLower);
 
 		if (lastNameVector)
 		{
 			lastNameVector->erase(
-				remove(lastNameVector->begin(), lastNameVector->end(), *heapIndex),
+				remove(lastNameVector->begin(), lastNameVector->end(), heapIndex),
 				lastNameVector->end());
 		}
 
