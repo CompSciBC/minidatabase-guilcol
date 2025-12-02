@@ -69,37 +69,39 @@ struct Engine
 			// We need to "delete" the old record and update both indexes
 			int oldIndex = *existingIndex;
 			heap[oldIndex].deleted = true;
-			// Since the last names might differ, we need to handle that too
+
+			// Old last name may differ from new last name, so update lastIndex accordingly
 			string oldLastNameLower = toLower(heap[oldIndex].last);
-
-			heap.push_back(recIn); // Add new record to heap
-
-			//  idIndex shouldn't care or keep track of the old record, DELETE IT
-			idIndex.erase(recIn.id);
-			idIndex.insert(recIn.id, rid); // And insert the new one in
-
-			// We have to remove the old RID from lastIndex
 			vector<int> *oldLastNameVector = lastIndex.find(oldLastNameLower);
-			if (oldLastNameVector) // I check just in case, but it should always exist
+			if (oldLastNameVector)
 			{
-				// Thanks C++, for making this so painful
-				// This code just removes an item from a vector
-				oldLastNameVector->erase(remove(oldLastNameVector->begin(), oldLastNameVector->end(), oldIndex), oldLastNameVector->end());
+				// Remove the old index from the vector in lastIndex
+				oldLastNameVector->erase(
+					remove(oldLastNameVector->begin(),
+						   oldLastNameVector->end(),
+						   oldIndex),
+					oldLastNameVector->end());
 			}
 
-			// Now we have to insert the new RID into lastName index
+			// Add new record to the heap
+			heap.push_back(recIn);
+			int newRid = heap.size() - 1;
+
+			// Erase old id from idIndex and add new one
+			// idIndex shouldn't care about deleted records
+			idIndex.erase(recIn.id);
+			idIndex.insert(recIn.id, newRid);
+
+			// Insert new last name into lastIndex
 			string newLastNameLower = toLower(recIn.last);
 			vector<int> *newLastNameVector = lastIndex.find(newLastNameLower);
 			if (!newLastNameVector)
 			{
-				// Doesn't exist, create new vector and insert
-				vector<int> newVector = {rid};
-				lastIndex.insert(newLastNameLower, newVector);
+				lastIndex.insert(newLastNameLower, vector<int>{newRid});
 			}
 			else
 			{
-				// Exists, append new RID
-				newLastNameVector->push_back(rid);
+				newLastNameVector->push_back(newRid);
 			}
 
 			return rid;
