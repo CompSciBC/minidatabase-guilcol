@@ -104,7 +104,7 @@ struct Engine
 				newLastNameVector->push_back(newRid);
 			}
 
-			return rid;
+			return newRid;
 		}
 	}
 
