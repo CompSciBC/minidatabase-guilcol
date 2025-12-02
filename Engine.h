@@ -1,58 +1,211 @@
 #ifndef ENGINE_H
 #define ENGINE_H
 
-#include <iostream>   
-#include <vector>     
-#include "BST.h"      
+#include <iostream>
+#include <vector>
+#include "BST.h"
 #include "Record.h"
-//add header files as needed
+// add header files as needed
 
 using namespace std;
 
 // Converts a string to lowercase (used for case-insensitive searches)
-static inline string toLower(string s) {
-    for (char &c : s) c = (char)tolower((unsigned char)c);
-    return s;
+static inline string toLower(string s)
+{
+	for (char &c : s)
+		c = (char)tolower((unsigned char)c);
+	return s;
 }
 
 // ================== Index Engine ==================
 // Acts like a small "database engine" that manages records and two BST indexes:
 // 1) idIndex: maps student_id → record index (unique key)
 // 2) lastIndex: maps lowercase(last_name) → list of record indices (non-unique key)
-struct Engine {
-    vector<Record> heap;                  // the main data store (simulates a heap file)
-    BST<int, int> idIndex;                // index by student ID
-    BST<string, vector<int>> lastIndex;   // index by last name (can have duplicates)
+struct Engine
+{
+	vector<Record> heap;				// the main data store (simulates a heap file)
+	BST<int, int> idIndex;				// index by student ID
+	BST<string, vector<int>> lastIndex; // index by last name (can have duplicates)
 
-    // Inserts a new record and updates both indexes.
-    // Returns the record ID (RID) in the heap.
-    int insertRecord(const Record &recIn) {
-        //TODO
-    }
+	// Inserts a new record and updates both indexes.
+	// Returns the record ID (RID) in the heap.
+	int insertRecord(const Record &recIn)
+	{
+		// Check if a record with the same ID already exists
+		int *existingIndex = idIndex.find(recIn.id);
+		int rid = heap.size(); // might as well register this here because we need it anyway
 
-    // Deletes a record logically (marks as deleted and updates indexes)
-    // Returns true if deletion succeeded.
-    bool deleteById(int id) {
-        //TODO
-    }
+		// In case NO record exists...
+		if (!existingIndex)
+		{
+			heap.push_back(recIn);						// Add to heap
+			idIndex.insert(recIn.id, rid);				// Add RID to idIndex
+			string lastNameLower = toLower(recIn.last); // Convert last name to lowercase for indexing
+			// A node for this last name might already exist
+			// Because two separate records would be stored in the same last name
+			// So check that first
+			vector<int> *lastNameVector = lastIndex.find(lastNameLower);
+			if (!lastNameVector)
+			{
+				// It doesn't exist!
+				// Create a new vector with this RID and insert, so simple
+				vector<int> newVector = {rid};
+				lastIndex.insert(lastNameLower, newVector);
+			}
+			else
+			{
+				// iT does exist!
+				// Just append this RID to the existing vector
+				lastNameVector->push_back(rid);
+			}
+			// Return the new heap index (RID)
+			return rid;
+		}
+		else
+		{
+			// In case a record with the same ID already exists...
+			// We need to "delete" the old record and update both indexes
+			int oldIndex = *existingIndex;
+			heap[oldIndex].deleted = true;
+			// Since the last names might differ, we need to handle that too
+			string oldLastNameLower = toLower(heap[oldIndex].last);
 
-    // Finds a record by student ID.
-    // Returns a pointer to the record, or nullptr if not found.
-    // Outputs the number of comparisons made in the search.
-    const Record *findById(int id, int &cmpOut) {
-        //TODO    }
+			heap.push_back(recIn); // Add new record to heap
 
-    // Returns all records with ID in the range [lo, hi].
-    // Also reports the number of key comparisons performed.
-    vector<const Record *> rangeById(int lo, int hi, int &cmpOut) {
-        //TODO
-    }
+			//  idIndex shouldn't care or keep track of the old record, DELETE IT
+			idIndex.erase(recIn.id);
+			idIndex.insert(recIn.id, rid); // And insert the new one in
 
-    // Returns all records whose last name begins with a given prefix.
-    // Case-insensitive using lowercase comparison.
-    vector<const Record *> prefixByLast(const string &prefix, int &cmpOut) {
-        //TODO
-    }
+			// We have to remove the old RID from lastIndex
+			vector<int> *oldLastNameVector = lastIndex.find(oldLastNameLower);
+			if (oldLastNameVector) // I check just in case, but it should always exist
+			{
+				// Thanks C++, for making this so painful
+				// This code just removes an item from a vector
+				oldLastNameVector->erase(remove(oldLastNameVector->begin(), oldLastNameVector->end(), oldIndex), oldLastNameVector->end());
+			}
+
+			// Now we have to insert the new RID into lastName index
+			string newLastNameLower = toLower(recIn.last);
+			vector<int> *newLastNameVector = lastIndex.find(newLastNameLower);
+			if (!newLastNameVector)
+			{
+				// Doesn't exist, create new vector and insert
+				vector<int> newVector = {rid};
+				lastIndex.insert(newLastNameLower, newVector);
+			}
+			else
+			{
+				// Exists, append new RID
+				newLastNameVector->push_back(rid);
+			}
+
+			return rid;
+		}
+	}
+
+	// Deletes a record logically (marks as deleted and updates indexes)
+	// Returns true if deletion succeeded.
+	bool deleteById(int id)
+	{
+		// Find the record in idIndex
+		int *heapIndex = idIndex.find(id);
+
+		if (!heapIndex) // Handle doesn't exist
+			return false;
+
+		// Exists, "delete" it softly
+		heap[*heapIndex].deleted = true;
+		idIndex.erase(id); // Remove from idIndex
+		string lastNameLower = toLower(heap[*heapIndex].last);
+		// Find key for lastIndex
+		vector<int> *lastNameVector = lastIndex.find(lastNameLower);
+
+		if (lastNameVector) // Then again, it should always exist, unless something went really wrong
+		{
+			// Remove this RID from the vector and remove index if empty
+			lastNameVector->erase(remove(lastNameVector->begin(), lastNameVector->end(), *heapIndex), lastNameVector->end());
+			if (lastNameVector->empty())
+			{
+				lastIndex.erase(lastNameLower);
+			}
+		}
+
+		return true;
+	}
+
+	// Finds a record by student ID.
+	// Returns a pointer to the record, or nullptr if not found.
+	// Outputs the number of comparisons made in the search.
+	const Record *findById(int id, int &cmpOut)
+	{
+		// Clear comparison counter
+		idIndex.resetMetrics();
+		int *heapIndex = idIndex.find(id);
+
+		// Set cpmOut to number of comparisons made
+		cmpOut = idIndex.comparisons;
+
+		// Return the proper pointer
+		if (!heapIndex)
+			return nullptr;
+		return &heap[*heapIndex];
+	}
+
+	// Returns all records with ID in the range [lo, hi].
+	// Also reports the number of key comparisons performed.
+	vector<const Record *> rangeById(int lo, int hi, int &cmpOut)
+	{
+		idIndex.resetMetrics();
+		vector<const Record *> rangeResults;
+
+		// Build a LAMBDA to use as callback
+		auto callback = [&](int /*key*/, int rid)
+		{
+			//  Only keep it if the record isn’t deleted
+			if (!heap[rid].deleted)
+			{
+				rangeResults.push_back(&heap[rid]);
+			}
+		};
+
+		// Run the rangeApply with the LAMBDA above
+		idIndex.rangeApply(lo, hi, callback);
+
+		cmpOut = idIndex.comparisons;
+		return rangeResults;
+	}
+
+	// Returns all records whose last name begins with a given prefix.
+	// Case-insensitive using lowercase comparison.
+	vector<const Record *> prefixByLast(const string &prefix, int &cmpOut)
+	{
+
+		lastIndex.resetMetrics();
+		vector<const Record *> rangeResults;
+
+		// Define lower and upper bounds for the prefix search
+		// '{' is the next ASCII value after z, it turns higherBound into the perfect upper limit
+		string lowerBound = prefix;
+		string higherBound = prefix + "{";
+
+		lastIndex.resetMetrics();
+
+		// Build a LAMBDA to use as callback like before
+		auto callback = [&](const string &key, const Record *&rec)
+		{
+			// Ignore deleted records, like before
+			if (!rec->deleted)
+			{
+				rangeResults.push_back(rec);
+			}
+		};
+
+		lastIndex.rangeApply(lowerBound, higherBound, callback);
+
+		cmpOut = lastIndex.comparisons;
+		return rangeResults;
+	}
 };
 
 #endif
