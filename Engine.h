@@ -5,6 +5,8 @@
 #include <vector>
 #include "BST.h"
 #include "Record.h"
+#include <algorithm>
+
 // add header files as needed
 
 using namespace std;
@@ -192,12 +194,14 @@ struct Engine
 		lastIndex.resetMetrics();
 
 		// Build a LAMBDA to use as callback like before
-		auto callback = [&](const string &key, const Record *&rec)
+		auto callback = [&](const string &, vector<int> &ridList)
 		{
-			// Ignore deleted records, like before
-			if (!rec->deleted)
+			for (int rid : ridList)
 			{
-				rangeResults.push_back(rec);
+				if (!heap[rid].deleted)
+				{
+					rangeResults.push_back(&heap[rid]);
+				}
 			}
 		};
 
