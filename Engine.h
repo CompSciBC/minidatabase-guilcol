@@ -123,14 +123,11 @@ struct Engine
 		// Find key for lastIndex
 		vector<int> *lastNameVector = lastIndex.find(lastNameLower);
 
-		if (lastNameVector) // Then again, it should always exist, unless something went really wrong
+		if (lastNameVector)
 		{
-			// Remove this RID from the vector and remove index if empty
-			lastNameVector->erase(remove(lastNameVector->begin(), lastNameVector->end(), *heapIndex), lastNameVector->end());
-			if (lastNameVector->empty())
-			{
-				lastIndex.erase(lastNameLower);
-			}
+			lastNameVector->erase(
+				remove(lastNameVector->begin(), lastNameVector->end(), *heapIndex),
+				lastNameVector->end());
 		}
 
 		return true;
@@ -188,8 +185,8 @@ struct Engine
 
 		// Define lower and upper bounds for the prefix search
 		// '{' is the next ASCII value after z, it turns higherBound into the perfect upper limit
-		string lowerBound = prefix;
-		string higherBound = prefix + "{";
+		string lowerBound = toLower(prefix);
+		string higherBound = lowerBound + "{";
 
 		lastIndex.resetMetrics();
 
